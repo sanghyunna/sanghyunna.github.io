@@ -1,65 +1,63 @@
-// Progressive enhancement for 나상현's site. Everything here is optional:
-// without JS the nav shows under the bar, the copy button is absent, and the
-// language links are plain links. Served with defer; must stay small (< 4 KB).
+// Progressive enhancement only. Without JS the nav stays solid, the copy button is absent,
+// and the language links are plain links.
 ;(() => {
-  const header = document.querySelector('.header')
-  const btn = header && header.querySelector('.menu-btn')
-  if (header && btn) {
-    const openLabel = btn.getAttribute('aria-label')
-    const closeLabel = btn.getAttribute('data-close-label') || openLabel
-    const set = (open) => {
-      header.dataset.nav = open ? 'open' : 'closed'
-      btn.setAttribute('aria-expanded', String(open))
-      btn.setAttribute('aria-label', open ? closeLabel : openLabel)
-    }
-    set(false)
-    btn.addEventListener('click', () => set(header.dataset.nav !== 'open'))
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && header.dataset.nav === 'open') {
-        set(false)
-        btn.focus()
-      }
+  const nav = document.querySelector('.nav')
+  const sentinel = document.querySelector('.hero__sentinel')
+  if (nav && sentinel && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(([entry]) => {
+      nav.dataset.state = entry.boundingClientRect.top > 0 ? 'over' : 'solid'
     })
-    const nav = document.getElementById(btn.getAttribute('aria-controls'))
-    if (nav)
-      nav.addEventListener('click', (e) => {
-        if (e.target.closest('a')) set(false)
-      })
+    io.observe(sentinel)
   }
 
-  // Copy-email button (added only when scripting is available).
-  const actions = document.querySelector('.contact__actions[data-email]')
-  if (actions) {
+  document.querySelectorAll('.nav__mobile').forEach((menu) => {
+    menu.querySelectorAll('a').forEach((a) =>
+      a.addEventListener('click', () => { menu.open = false }),
+    )
+    menu.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        menu.open = false
+        menu.querySelector('summary').focus()
+      }
+    })
+    document.addEventListener('pointerdown', (event) => {
+      if (!menu.contains(event.target)) menu.open = false
+    })
+  })
+
+  document.querySelectorAll('[data-copy-email]').forEach((holder) => {
     const b = document.createElement('button')
     b.type = 'button'
-    b.className = 'btn btn--secondary btn--lg'
+    b.className = 'btn btn--light btn--copy'
     b.innerHTML =
-      '<span class="btn__idle"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-copy"/></svg></span>' +
-      '<span class="btn__done"><svg class="icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg></span>'
-    b.querySelector('.btn__idle').append(actions.dataset.copy)
-    b.querySelector('.btn__done').append(actions.dataset.copied)
-    const status = actions.querySelector('[role="status"]')
+      '<svg class="icon" aria-hidden="true" focusable="false"><use href="/sprite.svg#i-copy"/></svg><span class="btn__label"></span>'
+    const label = b.querySelector('.btn__label')
+    label.textContent = holder.dataset.copy
+    const live = holder.querySelector('[role="status"]')
     let timer
     b.addEventListener('click', async () => {
+      const text = holder.dataset.copyEmail
       try {
-        await navigator.clipboard.writeText(actions.dataset.email)
+        await navigator.clipboard.writeText(text)
       } catch {
         const t = document.createElement('textarea')
-        t.value = actions.dataset.email
+        t.value = text
         document.body.append(t)
         t.select()
         document.execCommand('copy')
         t.remove()
       }
-      b.dataset.state = 'copied'
-      if (status) status.textContent = actions.dataset.copied
+      label.textContent = holder.dataset.copied
+      b.querySelector('use').setAttribute('href', '/sprite.svg#i-check')
+      if (live) live.textContent = holder.dataset.copied
       clearTimeout(timer)
       timer = setTimeout(() => {
-        delete b.dataset.state
+        label.textContent = holder.dataset.copy
+        b.querySelector('use').setAttribute('href', '/sprite.svg#i-copy')
       }, 2000)
     })
-    actions.insertBefore(b, status)
-  }
+    holder.insertBefore(b, live)
+  })
 
   // Keep the current #hash when switching languages.
   document.querySelectorAll('.lang__opt').forEach((a) =>
